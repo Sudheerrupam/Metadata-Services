@@ -1,0 +1,45 @@
+<template>
+    <lightning-card title="Metadata Explorer 2">
+        <div class="slds-p-around_medium">
+            <template if:true={isLoading}>
+                <lightning-spinner 
+                    alternative-text="Loading" 
+                    size="medium">
+                </lightning-spinner>
+            </template>
+
+            <lightning-combobox
+                name="object"
+                label="Select Object"
+                placeholder="Choose an Object"
+                options={objectOptions}
+                onchange={handleObjectChange}
+                value={selectedObject}>
+            </lightning-combobox>
+
+            <template if:true={selectedObject}>
+                <lightning-combobox
+                    name="layout"
+                    label="Select Layout"
+                    placeholder="Choose a Layout"
+                    options={layoutOptions}
+                    onchange={handleLayoutChange}
+                    value={selectedLayout}>
+                </lightning-combobox>
+            </template>
+            <template if:true={selectedLayout}>
+                <template for:each={fields} for:item="section">
+                    <div key={section.sectionName}>
+                        <h3><b>{section.sectionName}</b></h3>
+                        <ul>
+                            <template for:each={section.fields} for:item="field">
+                                <li key={field}>{field}</li>
+                            </template>
+                        </ul>
+                    </div>
+                </template>
+            </template>            
+            <lightning-button label="Download" variant="brand" onclick={handleDownload}></lightning-button>
+        </div>
+    </lightning-card>
+</template>
