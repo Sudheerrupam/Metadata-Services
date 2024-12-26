@@ -1,45 +1,112 @@
 <template>
-    <lightning-card title="Metadata Explorer 2">
+    <lightning-card title="Metadata Explorer" icon-name="standard:page">
         <div class="slds-p-around_medium">
+            <!-- Loading State -->
             <template if:true={isLoading}>
                 <lightning-spinner 
                     alternative-text="Loading" 
-                    size="medium">
+                    size="medium" 
+                    variant="brand">
                 </lightning-spinner>
             </template>
 
-            <lightning-combobox
-                name="object"
-                label="Select Object"
-                placeholder="Choose an Object"
-                options={objectOptions}
-                onchange={handleObjectChange}
-                value={selectedObject}>
-            </lightning-combobox>
-
-            <template if:true={selectedObject}>
-                <lightning-combobox
-                    name="layout"
-                    label="Select Layout"
-                    placeholder="Choose a Layout"
-                    options={layoutOptions}
-                    onchange={handleLayoutChange}
-                    value={selectedLayout}>
-                </lightning-combobox>
+            <!-- Error State -->
+            <template if:true={error}>
+                <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
+                    <span class="slds-assistive-text">error</span>
+                    <h2>{error.message}</h2>
+                </div>
             </template>
+
+            <!-- Selection Controls -->
+            <div class="slds-grid slds-gutters slds-wrap">
+                <div class="slds-col slds-size_1-of-2 slds-p-bottom_medium">
+                    <lightning-combobox
+                        name="object"
+                        label="Select Object"
+                        placeholder="Choose an Object"
+                        options={objectOptions}
+                        onchange={handleObjectChange}
+                        value={selectedObject}
+                        required>
+                    </lightning-combobox>
+                </div>
+                <div class="slds-p-top_medium slds-text-align_right">
+                    <lightning-button 
+                                label="Download All Layouts" 
+                                variant="neutral" 
+                                icon-name="utility:download"
+                                onclick={handleDownloadAll}
+                                disabled={isDisabled}>
+                            </lightning-button>
+                </div>
+
+                <div class="slds-col slds-size_1-of-2 slds-p-bottom_medium">
+                    <template if:true={selectedObject}>
+                        <lightning-combobox
+                            name="layout"
+                            label="Select Layout"
+                            placeholder="Choose a Layout"
+                            options={layoutOptions}
+                            onchange={handleLayoutChange}
+                            value={selectedLayout}
+                            required>
+                        </lightning-combobox>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Fields Display -->
             <template if:true={selectedLayout}>
-                <template for:each={fields} for:item="section">
-                    <div key={section.sectionName}>
-                        <h3><b>{section.sectionName}</b></h3>
-                        <ul>
-                            <template for:each={section.fields} for:item="field">
-                                <li key={field}>{field}</li>
+                <div class="slds-p-top_medium">
+                    <template if:true={fields.length}>
+                        <div class="slds-box slds-theme_default">
+                            <template for:each={fields} for:item="section">
+                                <div key={section.key} class="slds-p-bottom_medium">
+                                    <div class="slds-text-heading_small slds-p-bottom_x-small slds-theme_shade slds-p-around_x-small">
+                                        {section.sectionName}
+                                    </div>
+                                    <ul class="slds-has-dividers_bottom-space">
+                                        <template for:each={section.fields} for:item="field">
+                                            <li key={field} class="slds-item slds-p-around_x-small">
+                                                <lightning-icon
+                                                    icon-name="utility:field"
+                                                    size="xx-small"
+                                                    class="slds-p-right_x-small">
+                                                </lightning-icon>
+                                                {field}
+                                            </li>
+                                        </template>
+                                    </ul>
+                                </div>
                             </template>
-                        </ul>
-                    </div>
-                </template>
-            </template>            
-            <lightning-button label="Download" variant="brand" onclick={handleDownload}></lightning-button>
+                        </div>
+
+                        <!-- Download Buttons -->
+                        <div class="slds-p-top_medium slds-text-align_right">
+                            <lightning-button 
+                                label="Download CSV" 
+                                variant="brand" 
+                                icon-name="utility:download"
+                                onclick={handleDownload}
+                                disabled={isLoading}>
+                            </lightning-button>
+                        </div>
+                    </template>
+
+                    <!-- No Fields Message -->
+                    <template if:false={fields.length}>
+                        <div class="slds-illustration slds-illustration_small">
+                            <div class="slds-text-longform">
+                                <h3 class="slds-text-heading_medium">No fields found</h3>
+                                <p class="slds-text-body_regular">
+                                    No fields are available for the selected layout.
+                                </p>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
         </div>
     </lightning-card>
 </template>

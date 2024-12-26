@@ -1,116 +1,254 @@
 public class PageLayoutController {
+    private static final String TOOLING_API_VERSION = 'v62.0';
+    private static final String ENCODING = 'UTF-8';
     
-    
-    @Auraenabled(cacheable=true)
-    public static List<string> getObjects()
-    {
-        List<String> sObjectList = new List<String>();
-        for (Schema.SObjectType objType : Schema.getGlobalDescribe().values()) {
-            Schema.DescribeSObjectResult describeResult = objType.getDescribe();
-            if (!describeResult.isCustomSetting() && describeResult.isCreateable()) {
-                String name = describeResult.getName();
-                sObjectList.add(name);
+    @AuraEnabled(cacheable=true)
+    public static List<String> getObjects() {
+        try {
+            List<String> sObjectList = new List<String>();
+            Map<String, Schema.SObjectType> globalDescribe = Schema.getGlobalDescribe();
+            
+            for (Schema.SObjectType objType : globalDescribe.values()) {
+                Schema.DescribeSObjectResult describeResult = objType.getDescribe();
+                if (!describeResult.isCustomSetting() && describeResult.isCreateable()) {
+                    sObjectList.add(describeResult.getName());
+                }
             }
+            
+            sObjectList.sort();
+            return sObjectList;
+        } catch (Exception e) {
+            throw new AuraHandledException('Error retrieving objects: ' + e.getMessage());
         }
-        sObjectList.sort();
-        System.debug('Get Objects:' + sObjectList);
-    
-        return sObjectList;
+    }
+
+    @AuraEnabled
+    public static Map<String, Map<String, List<String>>> getAllLayoutsWithFields(String objectName) {
+        if (String.isBlank(objectName)) {
+            throw new AuraHandledException('Object name cannot be blank');
+        }
+        
+        try {
+            Map<String, Map<String, List<String>>> allLayouts = new Map<String, Map<String, List<String>>>();
+            List<String> layouts = getLayoutNameForObject(objectName);
+            
+            for (String layout : layouts) {
+                
+                Map<String, List<String>> sectionFields = getFields(objectName, layout);
+                Map<String, List<String>> sanitizedFields = new Map<String, List<String>>();
+                
+                for (String section : sectionFields.keySet()) {
+                    List<String> fields = sectionFields.get(section);
+                    List<String> sanitizedSectionFields = new List<String>();
+                    
+                    for (String field : fields) {
+                        
+                        String sanitizedField = field
+                            .replace('"', '')
+                            .replace('\n', ' ')
+                            .replace('\r', ' ')
+                            .trim();
+                        sanitizedSectionFields.add(sanitizedField);
+                    }
+                    
+                    sanitizedFields.put(section.trim(), sanitizedSectionFields);
+                }
+                
+                allLayouts.put(layout.trim(), sanitizedFields);
+            }
+            
+            return allLayouts;
+        } catch (Exception e) {
+            throw new AuraHandledException('Error retrieving layouts: ' + e.getMessage());
+        }
     }
     
-    @Auraenabled(cacheable=true)
-    public static List<string> getObjectLayout(string objectName)
-    {
+    @AuraEnabled(cacheable=true)
+    public static List<String> getObjectLayout(String objectName) {
+        if (String.isBlank(objectName)) {
+            throw new AuraHandledException('Object name cannot be blank');
+        }
         return getLayoutNameForObject(objectName);
     }
     
     @AuraEnabled(cacheable=true)
     public static Map<String, List<String>> getLayoutFields(String objectName, String layout) {
-    return getFields(objectName, layout);
-}
-
-    
-    
-    public static String toolingAPISOQL(String query) {
-        try {
-            
-            String baseURL = URL.getOrgDomainUrl().toExternalForm() + '/services/data/v62.0/tooling/query?q=' + EncodingUtil.urlEncode(query, 'UTF-8');
-            //String baseURL='callout:ToolingRest?';
-            //return HttpCallout.restGet( baseURL +'q='+ (query.replace(' ', '+')),'GET', );
-            
-            return HttpCallout.restGet(baseURL, 'GET','');
-        } catch (Exception ex) {
-            System.debug('Exception in toolingAPISOQL: ' + ex.getMessage());
-            return ex.getMessage();
+        if (String.isBlank(objectName) || String.isBlank(layout)) {
+            throw new AuraHandledException('Object name and layout must be specified');
         }
+        return getFields(objectName, layout);
     }
     
-    
-   static List<String> getLayoutNameForObject(String objectName) {
-    String sql = 'SELECT Name FROM Layout WHERE TableEnumOrId = \'' + objectName + '\'';
-    String body = toolingAPISOQL(sql);
-    System.debug('Tooling API Body: ' + body);
-
-    List<String> layouts = new List<String>();
-    if (String.isNotBlank(body)) {
+    private static String toolingAPISOQL(String query) {
+        if (String.isBlank(query)) {
+            throw new IllegalArgumentException('Query cannot be blank');
+        }
         
-        Map<String, Object> bodyMap = (Map<String, Object>) JSON.deserializeUntyped(body);
-        List<Object> records = (List<Object>) bodyMap.get('records');
-       
-        for (Object record : records) {
-            Map<String, Object> r = (Map<String, Object>) record;
-            String layoutName = (String) r.get('Name');
-            if (layoutName != null && !layouts.contains(layoutName)) {
-                layouts.add(layoutName);
-            }
+        try {
+            String baseURL = URL.getOrgDomainUrl().toExternalForm() + 
+                           '/services/data/' + TOOLING_API_VERSION + '/tooling/query?q=' + 
+                           EncodingUtil.urlEncode(query, ENCODING);
+            
+            return HttpCallout.restGet(baseURL, 'GET', '');
+        } catch (Exception ex) {
+            throw new AuraHandledException('Tooling API query failed: ' + ex.getMessage());
         }
-        System.debug('Retrieved Layouts: ' + layouts);
     }
-    return layouts;
-}
     
-static Map<String, List<String>> getFields(String objectName, String layout) {
-    String layoutName = String.format('{0}-{1}', new String[] {objectName, layout});
-    List<Metadata.Metadata> layouts = Metadata.Operations.retrieve(Metadata.MetadataType.Layout, new List<String> {layoutName});
-    System.debug('Page Layouts:' + layouts);
-
-    Map<String, List<String>> sections = new Map<String, List<String>>();
-    if (!layouts.isEmpty()) {
-        Metadata.Layout layoutMd = (Metadata.Layout) layouts.get(0);
-        System.debug('Layouts:' + layoutMd);
-        for (Metadata.LayoutSection section : layoutMd.layoutSections) {
-            List<String> fields = new List<String>();
-            for (Metadata.LayoutColumn column : section.layoutColumns) {
-                if (column.layoutItems != null) {
-                    for (Metadata.LayoutItem item : column.layoutItems) {
-                        if (item.field != null) {
-                            fields.add(item.field);
-                        }
-                    }
+    private static List<String> getLayoutNameForObject(String objectName) {
+        List<String> layouts = new List<String>();
+        
+        String sql = 'SELECT Name FROM Layout WHERE TableEnumOrId = \'' + String.escapeSingleQuotes(objectName) + '\'';
+        String response = toolingAPISOQL(sql);
+        
+        if (String.isNotBlank(response)) {
+            Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(response);
+            List<Object> records = (List<Object>) responseMap.get('records');
+            
+            Set<String> uniqueLayouts = new Set<String>();
+            for (Object record : records) {
+                Map<String, Object> layoutRecord = (Map<String, Object>) record;
+                String layoutName = (String) layoutRecord.get('Name');
+                if (String.isNotBlank(layoutName)) {
+                    uniqueLayouts.add(layoutName);
                 }
             }
+            
+            layouts.addAll(uniqueLayouts);
+            layouts.sort();
+        }
+        
+        return layouts;
+    }
+    
+    private static Map<String, List<String>> getFields(String objectName, String layout) {
+        Map<String, List<String>> sections = new Map<String, List<String>>();
+        
+        String layoutName = String.format('{0}-{1}', new List<String>{
+            String.escapeSingleQuotes(objectName),
+            String.escapeSingleQuotes(layout)
+        });
+        
+        try {
+            List<Metadata.Metadata> layouts = Metadata.Operations.retrieve(
+                Metadata.MetadataType.Layout, 
+                new List<String>{layoutName}
+            );
+            
+            if (!layouts.isEmpty()) {
+                Metadata.Layout layoutMd = (Metadata.Layout) layouts.get(0);
+                Map<String, Schema.SObjectField> fieldMap = Schema.getGlobalDescribe()
+                    .get(objectName)
+                    .getDescribe()
+                    .fields.getMap();
+                
+                sections = processLayoutSections(layoutMd.layoutSections, fieldMap);
+            }
+            
+            return sections;
+        } catch (Exception e) {
+            throw new AuraHandledException('Error retrieving layout fields: ' + e.getMessage());
+        }
+    }
+    
+    private static Map<String, List<String>> processLayoutSections(
+        List<Metadata.LayoutSection> layoutSections,
+        Map<String, Schema.SObjectField> fieldMap
+    ) {
+        Map<String, List<String>> sections = new Map<String, List<String>>();
+        
+        for (Metadata.LayoutSection section : layoutSections) {
+            List<String> fields = new List<String>();
+            
+            for (Metadata.LayoutColumn column : section.layoutColumns) {
+                if (column.layoutItems != null) {
+                    fields.addAll(processLayoutItems(column.layoutItems, fieldMap));
+                }
+            }
+            
             if (!fields.isEmpty()) {
                 sections.put(section.label, fields);
             }
         }
+        
+        return sections;
     }
-    System.debug('Sections with Fields:' + sections);
-    return sections;
-}
-
-    @AuraEnabled
-public static String generateCSV(String ObjectName, String LayoutName, List<String> fieldsList) {
-    List<String> csvData = new List<String>();
-    csvData.add('Object Name,Page Layout Name,Fields');
-
-    if (fieldsList == null || fieldsList.isEmpty()) {
-        csvData.add(ObjectName + ',' + LayoutName + ',No Fields Selected');
-    } else {
-        String fieldsString = String.join(fieldsList, ';');
-        csvData.add(ObjectName + ',' + LayoutName + ',' + fieldsString);
-    }
-
-    return String.join(csvData, '\n');
-}
-}
     
+    private static List<String> processLayoutItems(
+        List<Metadata.LayoutItem> items,
+        Map<String, Schema.SObjectField> fieldMap
+    ) {
+        List<String> fields = new List<String>();
+        
+        for (Metadata.LayoutItem item : items) {
+            if (String.isNotBlank(item.field) && fieldMap.containsKey(item.field)) {
+                Schema.DescribeFieldResult fieldDesc = fieldMap.get(item.field).getDescribe();
+                
+                if (fieldDesc.getType() == Schema.DisplayType.REFERENCE) {
+                    String relatedObject = fieldDesc.getReferenceTo()[0].getDescribe().getName();
+                    fields.add(item.field + ' -> ' + relatedObject + '.Name');
+                } else {
+                    fields.add(item.field);
+                }
+            }
+        }
+        
+        return fields;
+    }
+    
+    // @AuraEnabled
+    // public static String generateCSV(String objectName, String layoutName, Map<String, List<String>> sections) {
+    //     if (String.isBlank(objectName) || String.isBlank(layoutName)) {
+    //         throw new AuraHandledException('Object name and layout name must be specified');
+    //     }
+        
+    //     List<String> csvData = new List<String>();
+    //     csvData.add('Object Name,Page Layout Name,Section,Field');
+        
+    //     if (sections == null || sections.isEmpty()) {
+    //         csvData.add(String.format('{0},{1},No Sections,No Fields', 
+    //             new List<String>{objectName, layoutName}));
+    //     } else {
+    //         for (String sectionName : sections.keySet()) {
+    //             for (String field : sections.get(sectionName)) {
+    //                 if(field.contains(' -> ')) {
+    //                     system.debug('RRR 174');
+    //                     String lookupField = field.substringBefore(' -> ');
+    //                     String relatedObject = field.substringAfter(' -> ');
+    //                     system.debug('RRR 177 lookupField '+lookupField);
+    //                     system.debug('RRR 178 relatedObject '+relatedObject);
+    //                     csvData.add(String.format('{0},{1},{2},{3}',
+    //                         new List<String>{
+    //                             objectName,
+    //                             layoutName,
+    //                             sectionName,
+    //                             lookupField
+    //                         }
+    //                     ));
+    //                     csvData.add(String.format('{0},{1},{2},{3}',
+    //                         new List<String>{
+    //                             objectName,
+    //                             layoutName,
+    //                             sectionName,
+    //                             relatedObject
+    //                         }
+    //                     ));
+    //                 }
+    //                 else{
+    //                     system.debug('RRR 197');
+    //                     csvData.add(String.format('{0},{1},{2},{3}',
+    //                         new List<String>{
+    //                             objectName,
+    //                             layoutName,
+    //                             sectionName,
+    //                             field
+    //                         }
+    //                     ));
+    //                 }
+    //             }
+    //         }
+    //     }
+        
+    //     return String.join(csvData, '\n');
+    // }
+}
