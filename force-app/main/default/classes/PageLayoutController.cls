@@ -22,18 +22,99 @@ public class PageLayoutController {
         }
     }
 
+    @AuraEnabled(cacheable=true)
+    public static List<RecordTypeWrapper> getRecordTypes(String objectName) {
+        if (String.isBlank(objectName)) {
+            throw new AuraHandledException('Object name cannot be blank');
+        }
+        
+        try {
+            List<RecordTypeWrapper> recordTypes = new List<RecordTypeWrapper>();
+            Schema.DescribeSObjectResult describeResult = Schema.getGlobalDescribe().get(objectName).getDescribe();
+            Map<Id, Schema.RecordTypeInfo> rtMap = describeResult.getRecordTypeInfosById();
+            
+            // Add master record type first if it exists
+            for (Schema.RecordTypeInfo rti : rtMap.values()) {
+                if (rti.isMaster()) {
+                    recordTypes.add(new RecordTypeWrapper(
+                        rti.getRecordTypeId(),
+                        rti.getName(),
+                        rti.getDeveloperName(),
+                        true
+                    ));
+                    break;
+                }
+            }
+            
+            // Add other active record types
+            for (Schema.RecordTypeInfo rti : rtMap.values()) {
+                if (!rti.isMaster() && rti.isActive() && rti.isAvailable()) {
+                    recordTypes.add(new RecordTypeWrapper(
+                        rti.getRecordTypeId(),
+                        rti.getName(),
+                        rti.getDeveloperName(),
+                        false
+                    ));
+                }
+            }
+            
+            return recordTypes;
+        } catch (Exception e) {
+            throw new AuraHandledException('Error retrieving record types: ' + e.getMessage());
+        }
+    }
+    
+    public class RecordTypeWrapper {
+        @AuraEnabled public String recordTypeId { get; set; }
+        @AuraEnabled public String name { get; set; }
+        @AuraEnabled public String developerName { get; set; }
+        @AuraEnabled public Boolean isMaster { get; set; }
+        
+        public RecordTypeWrapper(String recordTypeId, String name, String developerName, Boolean isMaster) {
+            this.recordTypeId = recordTypeId;
+            this.name = name;
+            this.developerName = developerName;
+            this.isMaster = isMaster;
+        }
+    }
+    
     @AuraEnabled
-    public static Map<String, Map<String, List<String>>> getAllLayoutsWithFields(String objectName) {
+    public static Map<String, Map<String, List<String>>> getAllLayoutsWithFields(String objectName, String recordTypeId) {
         if (String.isBlank(objectName)) {
             throw new AuraHandledException('Object name cannot be blank');
         }
         
         try {
             Map<String, Map<String, List<String>>> allLayouts = new Map<String, Map<String, List<String>>>();
-            List<String> layouts = getLayoutNameForObject(objectName);
+            List<String> layouts;
             
-            for (String layout : layouts) {
+            if (String.isNotBlank(recordTypeId)) {
+                // Get layout assignment for specific record type
+                String sql = 'SELECT Layout.Name FROM ProfileLayout WHERE RecordTypeId = \'' + 
+                           String.escapeSingleQuotes(recordTypeId) + 
+                           '\' AND TableEnumOrId = \'' + String.escapeSingleQuotes(objectName) + 
+                           '\' LIMIT 1';
+                String response = toolingAPISOQL(sql);
                 
+                if (String.isNotBlank(response)) {
+                    Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(response);
+                    List<Object> records = (List<Object>) responseMap.get('records');
+                    
+                    if (!records.isEmpty()) {
+                        Map<String, Object> layoutRecord = (Map<String, Object>) records[0];
+                        Map<String, Object> layoutObj = (Map<String, Object>) layoutRecord.get('Layout');
+                        String layoutName = (String) layoutObj.get('Name');
+                        layouts = new List<String>{ layoutName };
+                    }
+                }
+            }
+            
+            if (layouts == null || layouts.isEmpty()) {
+                layouts = getLayoutNameForObject(objectName);
+            }
+            
+            // Rest of the existing getAllLayoutsWithFields logic
+            for (String layout : layouts) {
                 Map<String, List<String>> sectionFields = getFields(objectName, layout);
                 Map<String, List<String>> sanitizedFields = new Map<String, List<String>>();
                 
@@ -42,7 +123,6 @@ public class PageLayoutController {
                     List<String> sanitizedSectionFields = new List<String>();
                     
                     for (String field : fields) {
-                        
                         String sanitizedField = field
                             .replace('"', '')
                             .replace('\n', ' ')
@@ -60,6 +140,20 @@ public class PageLayoutController {
             return allLayouts;
         } catch (Exception e) {
             throw new AuraHandledException('Error retrieving layouts: ' + e.getMessage());
+        }
+    }
+    
+    public class RecordTypeInfo {
+        @AuraEnabled public String recordTypeId { get; set; }
+        @AuraEnabled public String name { get; set; }
+        @AuraEnabled public String developerName { get; set; }
+        @AuraEnabled public Boolean isDefault { get; set; }
+        
+        public RecordTypeInfo(String recordTypeId, String name, String developerName, Boolean isDefault) {
+            this.recordTypeId = recordTypeId;
+            this.name = name;
+            this.developerName = developerName;
+            this.isDefault = isDefault;
         }
     }
     

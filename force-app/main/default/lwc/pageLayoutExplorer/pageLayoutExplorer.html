@@ -33,12 +33,12 @@
                 </div>
                 <div class="slds-p-top_medium slds-text-align_right">
                     <lightning-button 
-                                label="Download All Layouts" 
-                                variant="neutral" 
-                                icon-name="utility:download"
-                                onclick={handleDownloadAll}
-                                disabled={isDisabled}>
-                            </lightning-button>
+                        label="Download All Layouts" 
+                        variant="neutral" 
+                        icon-name="utility:download"
+                        onclick={handleDownloadAll}
+                        disabled={isDisabled}>
+                    </lightning-button>
                 </div>
 
                 <div class="slds-col slds-size_1-of-2 slds-p-bottom_medium">
@@ -109,4 +109,47 @@
             </template>
         </div>
     </lightning-card>
+
+    <!-- Record Type Selection Modal -->
+    <template if:true={showRecordTypeModal}>
+        <section role="dialog" tabindex="-1" aria-labelledby="modal-heading-01" aria-modal="true" aria-describedby="modal-content-id-1" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <!-- Modal Header -->
+                <header class="slds-modal__header">
+                    <h2 id="modal-heading-01" class="slds-modal__title slds-hyphenate">
+                        Select Record Type
+                    </h2>
+                </header>
+                
+                <!-- Modal Body -->
+                <div class="slds-modal__content slds-p-around_medium" id="modal-content-id-1">
+                    <lightning-combobox
+                        name="recordType"
+                        label="Record Type"
+                        placeholder="Choose a Record Type"
+                        options={recordTypeOptions}
+                        onchange={handleRecordTypeSelect}
+                        value={selectedRecordType}>
+                    </lightning-combobox>
+                </div>
+
+                <!-- Modal Footer -->
+                <footer class="slds-modal__footer">
+                    <lightning-button 
+                        label="Cancel" 
+                        variant="neutral" 
+                        onclick={closeRecordTypeModal} 
+                        class="slds-m-right_x-small">
+                    </lightning-button>
+                    <lightning-button 
+                        label="Download" 
+                        variant="brand" 
+                        onclick={confirmRecordTypeSelection}
+                        disabled={isLoading}>
+                    </lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
 </template>
