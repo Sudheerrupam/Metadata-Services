@@ -33,7 +33,7 @@ public class PageLayoutController {
             Schema.DescribeSObjectResult describeResult = Schema.getGlobalDescribe().get(objectName).getDescribe();
             Map<Id, Schema.RecordTypeInfo> rtMap = describeResult.getRecordTypeInfosById();
             
-            // Add master record type first if it exists
+            
             for (Schema.RecordTypeInfo rti : rtMap.values()) {
                 if (rti.isMaster()) {
                     recordTypes.add(new RecordTypeWrapper(
@@ -46,7 +46,7 @@ public class PageLayoutController {
                 }
             }
             
-            // Add other active record types
+            
             for (Schema.RecordTypeInfo rti : rtMap.values()) {
                 if (!rti.isMaster() && rti.isActive() && rti.isAvailable()) {
                     recordTypes.add(new RecordTypeWrapper(
@@ -77,7 +77,7 @@ public class PageLayoutController {
             this.isMaster = isMaster;
         }
     }
-    
+
     @AuraEnabled
     public static Map<String, Map<String, List<String>>> getAllLayoutsWithFields(String objectName, String recordTypeId) {
         if (String.isBlank(objectName)) {
@@ -89,7 +89,7 @@ public class PageLayoutController {
             List<String> layouts;
             
             if (String.isNotBlank(recordTypeId)) {
-                // Get layout assignment for specific record type
+                
                 String sql = 'SELECT Layout.Name FROM ProfileLayout WHERE RecordTypeId = \'' + 
                            String.escapeSingleQuotes(recordTypeId) + 
                            '\' AND TableEnumOrId = \'' + String.escapeSingleQuotes(objectName) + 
@@ -113,7 +113,7 @@ public class PageLayoutController {
                 layouts = getLayoutNameForObject(objectName);
             }
             
-            // Rest of the existing getAllLayoutsWithFields logic
+           
             for (String layout : layouts) {
                 Map<String, List<String>> sectionFields = getFields(objectName, layout);
                 Map<String, List<String>> sanitizedFields = new Map<String, List<String>>();

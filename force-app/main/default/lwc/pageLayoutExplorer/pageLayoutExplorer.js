@@ -113,7 +113,7 @@
                 if (this.recordTypes.length > 0) {
                     this.showRecordTypeModal = true;
                 } else {
-                    // If no record types, proceed with download
+                
                     this.downloadAllLayouts();
                 }
             } catch (error) {
