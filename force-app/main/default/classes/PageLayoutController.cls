@@ -197,6 +197,7 @@ public class PageLayoutController {
         
         if (String.isNotBlank(response)) {
             Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(response);
+            system.debug('Response:' +responseMap);
             List<Object> records = (List<Object>) responseMap.get('records');
             
             Set<String> uniqueLayouts = new Set<String>();
@@ -281,6 +282,7 @@ public class PageLayoutController {
                 if (fieldDesc.getType() == Schema.DisplayType.REFERENCE) {
                     String relatedObject = fieldDesc.getReferenceTo()[0].getDescribe().getName();
                     fields.add(item.field + ' -> ' + relatedObject + '.Name');
+                    //fields.add(relatedObject + '.Name');
                 } else {
                     fields.add(item.field);
                 }

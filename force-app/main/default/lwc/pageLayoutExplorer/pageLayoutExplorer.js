@@ -111,7 +111,7 @@
                 this.recordTypes = result || [];
                 
                 if (this.recordTypes.length > 0) {
-                    this.showRecordTypeModal = true;
+                    this.showRecordTypeModal = true;    
                 } else {
                 
                     this.downloadAllLayouts();
@@ -190,33 +190,27 @@
                 const recordType = this.recordTypes.find(rt => rt.recordTypeId === recordTypeId);
                 return recordType ? recordType.developerName : '';
             }
-        generateCSVContentForAll(allLayouts) {
-            const header = 'Object Name,Page Layout Name,Section,Field\n';
-            let csvContent = header;
-            
-            for (const [layoutName, sections] of Object.entries(allLayouts)) {
-                for (const [sectionName, fields] of Object.entries(sections)) {
-                    for (const field of fields) {
-                        if (field.includes(' -> ')) {
-                            
-                            const [lookupField, relatedObject] = field.split(' -> ');
-                            
-                            
-                            csvContent += `${this.selectedObject},${layoutName},${sectionName},${lookupField}\n`;
-                            
-                            
-                            const [relObj, relField] = relatedObject.split('.');
-                            csvContent += `${relObj},${layoutName},${sectionName},${relField}\n`;
-                        } else {
-                            
-                            csvContent += `${this.selectedObject},${layoutName},${sectionName},${field}\n`;
+            generateCSVContentForAll(allLayouts) {
+                const header = 'Object Name,Page Layout Name,Section,Field\n';
+                let csvContent = header;
+                
+                for (const [layoutName, sections] of Object.entries(allLayouts)) {
+                    for (const [sectionName, fields] of Object.entries(sections)) {
+                        for (const field of fields) {
+                            if (field.includes(' -> ')) {
+                                const [lookupField, relatedObject] = field.split(' -> ');
+                                const relatedObjectName = relatedObject.split('.')[0];
+                                csvContent += `${this.selectedObject},${layoutName},${sectionName},${lookupField}\n`;
+                                csvContent += `${relatedObjectName},${layoutName},${sectionName},${relatedObjectName}.Name\n`;
+                            } else {
+                                csvContent += `${this.selectedObject},${layoutName},${sectionName},${field}\n`; 
+                            }
                         }
                     }
                 }
+                
+                return csvContent;
             }
-            
-            return csvContent;
-        }
         
         getTimestamp() {
             const now = new Date();
